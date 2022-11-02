@@ -1,220 +1,168 @@
 /*
-    bruteforcepi
+    BruteForcePi
     
-    renders a pretty (svg) that uses plotting random dots to calculate pi
+    renders pretty circles (svg) that uses brute force to calculate pi
 */
 
-function bruteforcepi(id, size=300) {
+function BruteForcePi(id, size=300) {
     this.id = id;
-    this.sizeMult = 1000000;
-    this.size = size * this.sizeMult;
-    this.speed = 1;
-    this.stepspeed = 100;
-    this.lastIn = false;
-    this.lastOut = false;
+    this.size = size;
     
-    this.getEl = function (name) {
-        return document.getElementById(name);
-    }
+    this.getMax = () => Math.pow(10, this.resolution * 1);
     
-    this.setValue = function (name, value) {
-        this.getEl(this.id + name).innerHTML = value;
-    }
-    
-    this.getValue = function (name) {
-        return parseInt(this.getEl(this.id + name).innerHTML);
-    }
-    
-    this.incValue = function (name) {
-        this.setValue(name, this.getValue(name)+1);
-    }
-    
-    this.draw = function () {
-        var el = this.getEl(this.id);
-        var html = '<table><tr>';
-        html += '<td><div id="' + this.id + 'draw"></div></td>';
-        html += '<td>&nbsp;</td>';
-        html += '<td>';
-        html += 'id ' + this.id + '<br />';
-        html += 'Within circle <span id="' + this.id + 'in"></span><br />';
-        html += 'Total calculations <span id="' + this.id + 'total"></span><br />';
-        html += '&pi; <span id="' + this.id + 'calc"></span>';
-        html += '</td></tr></table>';
-        el.innerHTML = html;
-    }
-    
-    this.getCenter = function () {
-        // return the coordinate of the center of the square
-        return [this.size/2, this.size/2];
-    }
+    this.getCenter = () => [this.getMax() / 2, this.getMax() / 2];
 
-    this.getRandCoord = function () {
-        // get a random coordinate within the square
-        return [Math.random() * this.size, Math.random() * this.size];
-    }
+    this.getCoords = () => [this.x, this.y];
 
-    this.isIn = function (c1, c2) {
-        // without even pretending to know what a circle is
-        // determine if a coordinate (c1) is within a circle
-        // by determining if it's distance from the center of the square (c2)
-        // is equal to or less than the radius (size / 2)
-        return Math.sqrt( 
+    this.isIn = (c1, c2) => Math.sqrt(
             Math.pow(c1[0] - c2[0], 2)
             +
             Math.pow(c1[1] - c2[1], 2)
-        ) <= this.size / 2;
-    }
+        ) <= this.getMax() / 2;
+    
+    this.doCalc = () => (this.inPI / this.count) * 4;
 
-    this.drawPixel = function (coord, color) {
+    this.getEl = name => document.getElementById( name );
+    
+    this.draw = () => {
+        var el = this.getEl(this.id);
+        var html = '<table>';
+        html += '<tr><td><div id="' + this.id + 'draw"></div></td></tr>';
+        html += '<tr><td>&nbsp;</td></tr>';
+        html += '<tr><td><div id="' + this.id + 'history"></div></td></tr>';
+        html += '</table>';
+        el.innerHTML = html;
+        
+        var el = this.getEl(this.id + 'draw');
+        var canvas = document.createElement('canvas');
+        canvas.width = this.size;
+        canvas.height = this.size;
+        canvas.id = this.id + 'draw';
+        el.parentNode.replaceChild(canvas, el);
+    };
+    
+    this.drawPixel = (coord, color) => {
         var el = this.getEl(this.id + 'draw');
         var ctx = el.getContext("2d");
         
-        ctx.strokeStyle = color;
-        ctx.beginPath();
-        // ugh, I have to use 2*pi (6.5 ;) (arc length in radians) to draw a round cirle 1 pixel wide :(
-        ctx.arc(coord[0] / this.sizeMult, coord[1] / this.sizeMult, 1, 0, 6.5);
-        ctx.stroke();
-    }
+        const hexToRgb = hex =>
+            hex.replace(/^#?([a-f\d])([a-f\d])([a-f\d])$/i
+             ,(m, r, g, b) => '#' + r + r + g + g + b + b)
+            .substring(1).match(/.{2}/g)
+            .map(x => parseInt(x, 16))
+        
+        let c = hexToRgb(color);
+        let x = parseInt((coord[0] * this.size) / this.getMax());
+        let y = parseInt((coord[1] * this.size) / this.getMax());
+        ctx.fillStyle = "rgba("+c[0]+","+c[1]+","+c[2]+",255)";
+        ctx.fillRect( x, y, 1, 1 );
+    };
     
-    this.doCalc = function () {
-        // pi is equal to the number of coordinates within a circle
-        // divided by the number of corrdinates withing a square
-        // times 4
-        this.setValue('calc', (this.getValue('in') / this.getValue('total')) * 4);
-    }
-    
-    this.init = function () {
-        // initialize
-        this.draw();
+    this.clearCanvas = () => {
         var el = this.getEl(this.id + 'draw');
-        var canvas = document.createElement('canvas');
-        canvas.width = this.size / this.sizeMult;
-        canvas.height = this.size / this.sizeMult;
-        canvas.id = this.id + 'draw';
-        el.parentNode.replaceChild(canvas, el);
-        this.setValue('in', '0');
-        this.setValue('total', '0');
-        this.setValue('calc', '0');
-    }
+        const context = el.getContext('2d');
+        context.clearRect(0, 0, this.size, this.size);
+        
+    };
     
-    this.run = function () {
-        //this = instance;
-        // get a random coordinate
-        var coord = this.getRandCoord();
+    this.updateHistory = () => {
+        let d = new Date();
+        
+        const numberWithCommas = x => x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        
+        var el = this.getEl(this.id + 'history');
+        var html = '<div>';
+        html += this.resolution + ': ';
+        html += '&pi;: ' + this.doCalc();
+        html += ' Calculations: 10<sup>' + (this.resolution * 2) + '</sup>';
+        let time = d.getTime() - this.startTime;
+        html += ' Time (ms): ' + numberWithCommas(time);
+        let perf = numberWithCommas(Math.round((Math.pow(10, this.resolution * 2) / (time / 1000))));
+        html += ' Calcs per second: ~' + perf;
+        html += '</div>' + el.innerHTML;
+        el.innerHTML = html;
+        
+        this.startTime = 0;
+    };
+    
+    this.dowWork = () => {
+        var coord = this.getCoords();
         // is it within a circle?
         var isin = this.isIn(coord, this.getCenter());
         if (isin) {
             color = this.lastIn ? '#0000FF' : '#8080FF';
-            this.lastIn = !this.lastIn;
-            this.incValue('in'); // increment circle within square count
+            this.lastIn = !!Math.floor(Math.random() * 2);
+            this.inPI++;
         } else {
             // don't increment circle within square count
             color = this.lastOut ? '#FF0000' : '#FF8080';
-            this.lastOut = !this.lastOut;
+            this.lastOut = !!Math.floor(Math.random() * 2);
         }
         // update
-        this.drawPixel(coord, color); //draw
-        this.incValue('total'); // increment number of calculations
-        this.doCalc(); // calculate pi
-    }
+        this.count++;
+        this.drawPixel(coord, color); // draw
+        this.x++;
+        // Check for new line
+        if (this.x == this.getMax()) {
+            this.x = 0;
+            this.y++;
+        }
+    };
     
-    this.go = function () {
+    this.init = () => {
+        // initialize
+        this.resolution = 1;
+        this.x = 0;
+        this.y = 0;
+        this.count = 0;
+        this.inPI = 0;
+        this.lastIn = false;
+        this.lastOut = false;
+        this.workRate = 10000; // iterations per thread
+        this.resolutionDelay = 2000; // delay (ms) between complete circles
+        this.startTime = 0;
+        // init UI
+        this.draw();
+    };
+    
+    this.run = me => {
+        // If re/starting set start time and clear canvas
+        if (me.startTime == 0) {
+            let d = new Date();
+            me.startTime = d.getTime();
+            me.clearCanvas();
+        }
+        
+        // Do me.workRate calc's in current thread
+        while (me.y < me.getMax() && me.count % me.workRate) {
+            me.dowWork();
+        }
+        // End this thread and start new thread to give the browser a break
+        if (me.y < me.getMax()) {
+            me.dowWork();
+            
+            window.setTimeout(me.run, 1, me);
+        } else { // Complete calcs and start again at higher res
+            me.y = 0;
+
+            me.updateHistory();
+            
+            me.resolution++;
+            me.count = 0;
+            me.inPI = 0;
+            
+            window.setTimeout(me.run, me.resolutionDelay, me);
+        }
+    };
+    
+    this.go = () => {
         var me = this;
         me.init();
         
-        // run 'run' every 'speed' milliseconds
-        window.setInterval(function() {
-            for (var i=0; i<me.stepspeed; i++) {
-                me.run();
-            }
-        }, me.speed);
-        
+        window.setTimeout(me.run, 1, me);
         console.log('Started ' + me.id);
-    }
+    };
     
     this.go();
     
 }
-
-/*
-    bruteforcepimachine
-    
-    creates a factory of "count" workers to detrmine pi
-    and averages their results to get a better result (?)
-*/
-function bruteforcepimachine(id, count=10, size=300) {
-    this.starttime = Date.now();
-    this.id = id;
-    this.count = count;
-    this.size = size;
-    this.speed = 10;
-    
-    // borrow the getEl function from bruteforcepi
-    this.getEl = function (name) {
-        return document.getElementById(name);
-    }
-    
-    this.calc = function() {
-        var total = 0;
-        var totalpi = 0;
-        var el;
-        var avg = this.getEl(this.id + 'average');
-        var time = this.getEl(this.id + 'time');
-        var complete = this.getEl(this.id + 'complete');
-        var runtime = new Date(Date.now() - this.starttime);
-
-        // total each workers calculation of pi
-        for (var i = 0; i < this.count; i++) {
-            el = this.getEl(this.id + 'contain' + i + 'calc');
-            totalpi += parseFloat( el.innerHTML );
-            el = this.getEl(this.id + 'contain' + i + 'total');
-            total += parseFloat( el.innerHTML );
-        }
-        // the average is total work / workers
-        avg.innerHTML = totalpi / count;
-        var days = Math.floor(runtime / 864e5),
-            hours = Math.floor(runtime % 864e5 / 36e5),
-            minutes = Math.floor(runtime % 36e5 / 60000),
-            seconds = Math.floor(runtime % 60000 / 1000);
-        var strtime = '' + seconds + 's';
-        if (minutes != 0 || hours != 0) strtime = minutes + 'm:' + strtime;
-        if (hours != 0) strtime = '' + hours + 'h:' + strtime;
-        if (days > 0) strtime = '' + days + ' days ' + strtime;
-        time.innerHTML = strtime;
-        complete.innerHTML = total;
-}
-    
-    this.init = function() {
-        this.starttiime = Date.now();
-        var me = this;
-        var worker;
-        var el = this.getEl(this.id);
-        
-        // container for an "average" of pi
-        var html = '<div>';
-        html += 'Workers: ' + this.count + '<br />';
-        html += 'Work completed: <span id="' + this.id + 'complete"></span><br />';
-        html += 'Run time: <span id="' + this.id + 'time"></span><br />';
-        html += 'Average &pi;: <span id="' + this.id + 'average"></span><br /><br />';
-        html += '</div>';
-        // build "count" containers
-        for (var i = 0; i < this.count; i++) {
-            html += '<div id="' + this.id + 'contain' + i + '"></div>';
-        }
-        el.innerHTML = html;
-        // start "count" bruteforcepi's
-        for (i = 0; i < this.count; i++) {
-            worker = new bruteforcepi(this.id + 'contain' + i, this.size);
-        }
-        // binding for average
-        // I can't bind to a span change so I'll rely on things are happening over time.
-        // The workers could be in an inconsisent state so I'm not sure if averages help
-        window.setInterval(function() {
-            me.calc();
-        }, me.speed);
-        
-    }
-    
-    this.init();
-}
-
