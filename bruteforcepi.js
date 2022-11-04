@@ -42,8 +42,6 @@ function BruteForcePi(id, size=300) {
     };
     
     this.drawPixel = (coord, color) => {
-        var el = this.getEl(this.id + 'draw');
-        var ctx = el.getContext("2d");
         
         const hexToRgb = hex =>
             hex.replace(/^#?([a-f\d])([a-f\d])([a-f\d])$/i
@@ -51,11 +49,18 @@ function BruteForcePi(id, size=300) {
             .substring(1).match(/.{2}/g)
             .map(x => parseInt(x, 16))
         
-        let c = hexToRgb(color);
         let x = parseInt((coord[0] * this.size) / this.getMax());
         let y = parseInt((coord[1] * this.size) / this.getMax());
-        ctx.fillStyle = "rgba("+c[0]+","+c[1]+","+c[2]+",255)";
-        ctx.fillRect( x, y, 1, 1 );
+        // Don't redraw pixels
+        if (x != this.prevDrawX || y != this.prevDrawY) {
+            let el = this.getEl(this.id + 'draw');
+            let ctx = el.getContext("2d");
+            let c = hexToRgb(color);
+            ctx.fillStyle = "rgba("+c[0]+","+c[1]+","+c[2]+",255)";
+            ctx.fillRect( x, y, 1, 1 );
+            this.prevDrawX = x;
+            this.prevDrawY = y;
+        }
     };
     
     this.clearCanvas = () => {
@@ -105,21 +110,24 @@ function BruteForcePi(id, size=300) {
         // Check for new line
         if (this.x == this.getMax()) {
             this.x = 0;
+            this.prevDrawX = -1;
             this.y++;
         }
     };
     
     this.init = () => {
         // initialize
-        this.resolution = 1;
-        this.x = 0;
-        this.y = 0;
-        this.count = 0;
-        this.inPI = 0;
-        this.lastIn = false;
-        this.lastOut = false;
         this.workRate = 10000; // iterations per thread
         this.resolutionDelay = 2000; // delay (ms) between complete circles
+        this.resolution = 1;
+        this.lastIn = false;
+        this.lastOut = false;
+        this.x = 0;
+        this.y = 0;
+        this.prevDrawX = -1;
+        this.prevDrawY = -1;
+        this.count = 0;
+        this.inPI = 0;
         this.startTime = 0;
         // init UI
         this.draw();
@@ -131,6 +139,8 @@ function BruteForcePi(id, size=300) {
             let d = new Date();
             me.startTime = d.getTime();
             me.clearCanvas();
+            this.prevDrawX = -1;
+            this.prevDrawY = -1;
         }
         
         // Do me.workRate calc's in current thread
@@ -144,6 +154,7 @@ function BruteForcePi(id, size=300) {
             window.setTimeout(me.run, 1, me);
         } else { // Complete calcs and start again at higher res
             me.y = 0;
+            me.prevDrawY = -1;
 
             me.updateHistory();
             
